@@ -2,60 +2,48 @@
 #targetengine main;
 var ai2assBackend, backendScript, bt, dlg, dlgRes, exportMethods, k, objToString, outputFormats, pathCombiningStrategies, radioString, v, win;
 
-ai2assBackend = function(options) {
+ai2assBackend = function (options) {
   var ASS_createDrawingFromPoints, black, checkLinear, countPathItems, doc, drawing, handleGray, handleRGB, manageColor, manageOpacity, methods, org, pWin, run, zeroPad;
   app.userInteractionLevel = UserInteractionLevel.DISPLAYALERTS;
   pWin = new Window("palette");
-  pWin.text = "Progress Occurs";
+  pWin.text = "进度";
   pWin.pBar = pWin.add("progressbar", void 0, 0, 250);
   pWin.pBar.preferredSize = [250, 10];
   doc = app.activeDocument;
   org = doc.rulerOrigin;
   black = new RGBColor();
-  countPathItems = function(obj) {
-    var count, recurse;
-    recurse = function(obj) {
-      var i, l, layer, len, len1, len2, m, pageItem, path, ref, ref1, ref2, results, results1, results2;
-      if (!obj.hidden) {
-        switch (obj.typename) {
-          case "Document":
-            ref = obj.layers;
-            results = [];
-            for (i = 0, len = ref.length; i < len; i++) {
-              layer = ref[i];
-              results.push(recurse(layer));
-            }
-            return results;
-            break;
-          case "Layer":
-          case "GroupItem":
-            ref1 = obj.pageItems;
-            results1 = [];
-            for (l = 0, len1 = ref1.length; l < len1; l++) {
-              pageItem = ref1[l];
-              results1.push(recurse(pageItem));
-            }
-            return results1;
-            break;
-          case "CompoundPathItem":
-            ref2 = obj.pathItems;
-            results2 = [];
-            for (m = 0, len2 = ref2.length; m < len2; m++) {
-              path = ref2[m];
-              results2.push(recurse(path));
-            }
-            return results2;
-            break;
-          case "PathItem":
-            return count += 1;
-        }
+  countPathItems = function (obj) {
+    function recurse(obj) {
+      if (obj.hidden) {
+        return 0;
       }
+
+      var count = 0, ref;
+      switch (obj.typename) {
+        case "Document":
+          ref = obj.layers;
+          break;
+        case "Layer":
+        case "GroupItem":
+          ref = obj.pageItems;
+          break;
+        case "CompoundPathItem":
+          ref = obj.pathItems;
+          break;
+        case "PathItem":
+          return 1;
+        default:
+          return 0;
+      }
+
+      for (var i = 0; i < ref.length; i++) {
+        count += recurse(ref[i]);
+      }
+      return count;
     };
-    count = 0;
-    recurse(obj);
-    return count;
+    return recurse(obj);
   };
-  run = function(root, includeEmptyLayers) {
+  run = function (root, includeEmptyLayers) {
     var output;
     if (root == null) {
       root = doc;
@@ -66,7 +54,7 @@ ai2assBackend = function(options) {
       pathCnt: null,
       processedPathCnt: 0,
       tempLayer: null,
-      makeTempLayer: function(name) {
+      makeTempLayer: function (name) {
         if (name == null) {
           name = "AI2ASS_tmp";
         }
@@ -74,13 +62,13 @@ ai2assBackend = function(options) {
         this.tempLayer.name = name;
         return this.tempLayer.zOrder(ZOrderMethod.SENDTOBACK);
       },
-      makeClip: function(clippingPath) {
+      makeClip: function (clippingPath) {
         var clip;
         clip = {
           tempGroup: null,
           isVisible: false,
           output: this,
-          add: function(clippingPath) {
+          add: function (clippingPath) {
             var copy, prevSelection;
             if (this.output.tempLayer == null) {
               this.output.makeTempLayer();
@@ -110,13 +98,13 @@ ai2assBackend = function(options) {
               return this.isVisible = true;
             }
           },
-          copy: function() {
+          copy: function () {
             return makeClip(this.tempGroup.pageItems[0]);
           },
-          get: function() {
+          get: function () {
             return this.tempGroup.pageItems[0];
           },
-          getASS: function() {
+          getASS: function () {
             var drawing;
             drawing = ASS_createDrawingFromPoints(this.tempGroup.pageItems[0].pathPoints);
             return "\\clip(" + (drawing.join(' ')) + ")";
@@ -125,20 +113,20 @@ ai2assBackend = function(options) {
         clip.add(clippingPath);
         return clip;
       },
-      makeLayer: function(emptyPrefix) {
+      makeLayer: function (emptyPrefix) {
         var layer;
         layer = {
           groups: [],
           currGroupIdx: -1,
           currGroup: null,
           emptyPrefix: null,
-          makeMergeGroup: function() {
+          makeMergeGroup: function () {
             var group;
             group = {
               dirtyRects: [],
               lines: {},
               layer: this,
-              addPath: function(path, prefix) {
+              addPath: function (path, prefix) {
                 var drawing;
                 if (!this.isZeroArea(path.visibleBounds)) {
                   this.dirtyRects.push(path.visibleBounds);
@@ -150,10 +138,10 @@ ai2assBackend = function(options) {
                   }
                 }
               },
-              isZeroArea: function(bounds) {
+              isZeroArea: function (bounds) {
                 return bounds[2] - bounds[0] === 0 && bounds[3] - bounds[1] === 0;
               },
-              isMergeable: function(path) {
+              isMergeable: function (path) {
                 var bounds, i, len, rect, ref;
                 if (path.parent.typename === "CompoundPathItem") {
                   return true;
@@ -181,12 +169,12 @@ ai2assBackend = function(options) {
             };
             return group;
           },
-          addGroup: function() {
+          addGroup: function () {
             this.currGroupIdx += 1;
             this.currGroup = this.makeMergeGroup();
             return this.groups[this.currGroupIdx] = this.currGroup;
           },
-          addPath: function(path, prefix) {
+          addPath: function (path, prefix) {
             if (!this.currGroup.isMergeable(path)) {
               this.addGroup();
             }
@@ -198,7 +186,7 @@ ai2assBackend = function(options) {
         layer.addGroup();
         return layer;
       },
-      process: function(obj, clip, opacity) {
+      process: function (obj, clip, opacity) {
         var clipPath, i, l, layer, m, n, pI, path, ref, ref1, ref2, ref3, results, results1, results2, results3, subPageItem;
         if (opacity == null) {
           opacity = 100;
@@ -217,7 +205,6 @@ ai2assBackend = function(options) {
                 results.push(this.process(layer));
               }
               return results;
-              break;
             case "Layer":
               if (obj.pageItems.length === 0) {
                 return this.layers[obj.zOrderPosition] = this.makeLayer(this.emptyPrefix(obj.zOrderPosition, obj.name));
@@ -230,7 +217,6 @@ ai2assBackend = function(options) {
                 }
                 return results1;
               }
-              break;
             case "CompoundPathItem":
               ref2 = obj.pathItems;
               results2 = [];
@@ -239,10 +225,9 @@ ai2assBackend = function(options) {
                 results2.push(this.process(path, clip, opacity));
               }
               return results2;
-              break;
             case "GroupItem":
               if (obj.clipped) {
-                clipPath = ((function() {
+                clipPath = ((function () {
                   var len, n, ref3, results3;
                   ref3 = obj.pageItems;
                   results3 = [];
@@ -271,7 +256,6 @@ ai2assBackend = function(options) {
                 }
               }
               return results3;
-              break;
             case "PathItem":
               if (this.processedPathCnt % 10 === 0) {
                 pWin.pBar.value = Math.ceil(this.processedPathCnt * 250 / this.pathCnt);
@@ -284,7 +268,7 @@ ai2assBackend = function(options) {
           }
         }
       },
-      appendPath: function(path, clipObj, opacity) {
+      appendPath: function (path, clipObj, opacity) {
         var alpha, clip, fill, layer, layerName, layerNum, prefix, stroke;
         stroke = manageColor(path, "strokeColor", 3);
         fill = manageColor(path, "fillColor", 1);
@@ -300,16 +284,16 @@ ai2assBackend = function(options) {
         }
         return layer.addPath(path, prefix);
       },
-      prefix: function(stroke, fill, clip, alpha) {
+      prefix: function (stroke, fill, clip, alpha) {
         return "{\\an7\\pos(0,0)" + stroke + fill + alpha + clip + "\\p1}";
       },
-      emptyPrefix: function() {
+      emptyPrefix: function () {
         return "";
       },
-      suffix: function() {
+      suffix: function () {
         return "{\\p0}";
       },
-      get: function(includeEmptyLayers) {
+      get: function (includeEmptyLayers) {
         var drawing, fragments, i, l, layer, len, len1, mergeGroup, prefix, ref, ref1, ref2, suffix;
         fragments = [];
         suffix = this.suffix();
@@ -345,37 +329,37 @@ ai2assBackend = function(options) {
     }
     switch (options.wrapper) {
       case "clip":
-        output.prefix = function() {
+        output.prefix = function () {
           return "\\clip(";
         };
-        output.suffix = function() {
+        output.suffix = function () {
           return ")";
         };
         break;
       case "iclip":
-        output.prefix = function() {
+        output.prefix = function () {
           return "\\iclip(";
         };
-        output.suffix = function() {
+        output.suffix = function () {
           return ")";
         };
         break;
       case "bare":
-        output.prefix = function() {
+        output.prefix = function () {
           return "";
         };
-        output.suffix = function() {
+        output.suffix = function () {
           return "";
         };
         break;
       case "line":
-        output.prefix = function(stroke, fill, clip, alpha, layerNum, layerName) {
+        output.prefix = function (stroke, fill, clip, alpha, layerNum, layerName) {
           return "Dialogue: " + layerNum + ",0:00:00.00,0:00:00.00,AI," + layerName + ",0,0,0,,{\\an7\\pos(0,0)" + stroke + fill + alpha + clip + "\\p1}";
         };
-        output.suffix = function() {
+        output.suffix = function () {
           return "";
         };
-        output.emptyPrefix = function(layerNum, layerName) {
+        output.emptyPrefix = function (layerNum, layerName) {
           return "Dialogue: " + layerNum + ",0:00:00.00,0:00:00.00,AI," + layerName + ",0,0,0,,";
         };
     }
@@ -392,10 +376,10 @@ ai2assBackend = function(options) {
   };
   drawing = {
     commands: [],
-    "new": function() {
+    "new": function () {
       return this.commands = [];
     },
-    get: function() {
+    get: function () {
       return this.commands;
     },
     CmdTypes: {
@@ -405,12 +389,12 @@ ai2assBackend = function(options) {
       Cubic: 2
     },
     prevCmdType: -1,
-    addMove: function(point) {
+    addMove: function (point) {
       this.commands.push("m");
       this.addCoords(point.anchor);
       return this.prevCmdType = this.CmdTypes.Move;
     },
-    addLinear: function(point) {
+    addLinear: function (point) {
       if (this.prevCmdType !== this.CmdTypes.Linear) {
         this.commands.push("l");
         this.prevCmdType = this.CmdTypes.Linear;
@@ -418,7 +402,7 @@ ai2assBackend = function(options) {
       this.commands.push;
       return this.addCoords(point.anchor);
     },
-    addCubic: function(currPoint, prevPoint) {
+    addCubic: function (currPoint, prevPoint) {
       if (this.prevCmdType !== this.CmdTypes.Cubic) {
         this.commands.push("b");
         this.prevCmdType = this.CmdTypes.Cubic;
@@ -427,18 +411,18 @@ ai2assBackend = function(options) {
       this.addCoords(currPoint.leftDirection);
       return this.addCoords(currPoint.anchor);
     },
-    addCoords: function(coordArr) {
+    addCoords: function (coordArr) {
       this.commands.push(Math.round((coordArr[0] + org[0]) * 100) / 100);
       return this.commands.push(Math.round((doc.height - (org[1] + coordArr[1])) * 100) / 100);
     }
   };
-  checkLinear = function(currPoint, prevPoint) {
+  checkLinear = function (currPoint, prevPoint) {
     var p1, p2;
     p1 = prevPoint.anchor[0] === prevPoint.rightDirection[0] && prevPoint.anchor[1] === prevPoint.rightDirection[1];
     p2 = currPoint.anchor[0] === currPoint.leftDirection[0] && currPoint.anchor[1] === currPoint.leftDirection[1];
     return p1 && p2;
   };
-  zeroPad = function(num) {
+  zeroPad = function (num) {
     var hexStr;
     hexStr = num.toString(16).toUpperCase();
     if (num < 16) {
@@ -447,20 +431,20 @@ ai2assBackend = function(options) {
       return hexStr;
     }
   };
-  handleGray = function(theColor) {
+  handleGray = function (theColor) {
     var pct;
     pct = theColor.gray;
     pct = Math.round((100 - pct) * 255 / 100);
     return "&H" + (zeroPad(pct)) + (zeroPad(pct)) + (zeroPad(pct)) + "&";
   };
-  handleRGB = function(theColor) {
+  handleRGB = function (theColor) {
     var b, g, r;
     r = Math.round(theColor.red);
     g = Math.round(theColor.green);
     b = Math.round(theColor.blue);
     return "&H" + (zeroPad(b)) + (zeroPad(g)) + (zeroPad(r)) + "&";
   };
-  manageColor = function(currPath, field, ASSField) {
+  manageColor = function (currPath, field, ASSField) {
     var fmt;
     fmt = "";
     switch (currPath[field].typename) {
@@ -483,13 +467,13 @@ ai2assBackend = function(options) {
     }
     return "\\" + ASSField + "c" + fmt;
   };
-  manageOpacity = function(opacity) {
+  manageOpacity = function (opacity) {
     if (opacity >= 100) {
       return "";
     }
     return "\\alpha&H" + (zeroPad(255 - Math.round(opacity) / 100 * 255)) + "&";
   };
-  ASS_createDrawingFromPoints = function(pathPoints) {
+  ASS_createDrawingFromPoints = function (pathPoints) {
     var currPoint, i, j, prevPoint, ref;
     drawing["new"]();
     if (pathPoints.length > 0) {
@@ -514,7 +498,7 @@ ai2assBackend = function(options) {
     }
   };
   methods = {
-    collectActiveLayer: function() {
+    collectActiveLayer: function () {
       var currLayer;
       currLayer = doc.activeLayer;
       if (!currLayer.visible) {
@@ -522,19 +506,19 @@ ai2assBackend = function(options) {
       }
       return run(currLayer);
     },
-    collectAllLayers: function() {
+    collectAllLayers: function () {
       return run();
     },
-    collectAllLayersIncludeEmpty: function() {
+    collectAllLayersIncludeEmpty: function () {
       return run(doc, true);
     }
   };
   return methods[options.method]();
 };
 
-dlgRes = "Group { orientation:'column', alignChildren: ['fill', 'fill'], output: Panel { orientation:'column', text: 'ASS Output', edit: EditText {text: 'have ass, will typeset', properties: {multiline: true}, alignment: ['fill', 'fill'], preferredSize: [-1, 100] } }, outputFormat: Panel { orientation:'column', text: 'Output Format', clip: Group {orientation: 'row', alignChildren: ['fill', 'fill'], spacing: 5, noclip: RadioButton {text: 'Drawing', value: true}, clip: RadioButton {text: '\\\\clip'}, iclip: RadioButton {text: '\\\\iclip'}, bare: RadioButton {text: 'Bare'}, line: RadioButton {text: 'Line'} }, }, settings: Panel {orientation: 'column', alignChildren: ['left','fill'], text: 'Settings', collectionTarget: DropDownList {title: 'Collection Target:'}, pathCombining: DropDownList {title: 'Path Combining:'} }, export: Button {text: 'Export'} }";
+dlgRes = "Group { orientation:'column', alignChildren: ['fill', 'fill'], output: Panel { orientation:'column', text: '导出 ASS', edit: EditText {text: '导出 ASS 的位置', properties: {multiline: true}, alignment: ['fill', 'fill'], preferredSize: [-1, 100] } }, outputFormat: Panel { orientation:'column', text: '导出格式', clip: Group {orientation: 'row', alignChildren: ['fill', 'fill'], spacing: 5, noclip: RadioButton {text: 'Drawing', value: true}, clip: RadioButton {text: '\\\\clip'}, iclip: RadioButton {text: '\\\\iclip'}, bare: RadioButton {text: '绘图指令'}, line: RadioButton {text: '字幕行'} }, }, settings: Panel {orientation: 'column', alignChildren: ['left','fill'], text: '设置', collectionTarget: DropDownList {title: 'Collection Target:'}, pathCombining: DropDownList {title: 'Path Combining:'} }, export: Button {text: '导出'} }";
 
-win = new Window("palette", "Export ASS", void 0, {});
+win = new Window("palette", "导出 ASS", void 0, {});
 
 dlg = win.add(dlgRes);
 
@@ -542,8 +526,8 @@ outputFormats = {
   "Drawing:": "noclip",
   "\\clip": "clip",
   "\\iclip": "iclip",
-  "Bare": "bare",
-  "Line": "line"
+  "绘图指令": "bare",
+  "字幕行": "line"
 };
 
 exportMethods = {
@@ -578,7 +562,7 @@ bt.target = "illustrator";
 
 backendScript = ai2assBackend.toString();
 
-radioString = function(radioGroup) {
+radioString = function (radioGroup) {
   var child, i, len, ref;
   ref = radioGroup.children;
   for (i = 0, len = ref.length; i < len; i++) {
@@ -589,9 +573,9 @@ radioString = function(radioGroup) {
   }
 };
 
-objToString = function(obj) {
+objToString = function (obj) {
   var fragments;
-  fragments = ((function() {
+  fragments = ((function () {
     var results;
     results = [];
     for (k in obj) {
@@ -603,7 +587,7 @@ objToString = function(obj) {
   return "{" + fragments + "}";
 };
 
-dlg["export"].onClick = function() {
+dlg["export"].onClick = function () {
   var options;
   dlg.output.edit.active = false;
   options = objToString({
@@ -612,11 +596,11 @@ dlg["export"].onClick = function() {
     combineStrategy: pathCombiningStrategies[dlg.settings.pathCombining.selection.text]
   });
   bt.body = "(" + backendScript + ")(" + options + ");";
-  bt.onResult = function(result) {
+  bt.onResult = function (result) {
     dlg.output.edit.text = result.body.replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
     return dlg.output.edit.active = true;
   };
-  bt.onError = function(err) {
+  bt.onError = function (err) {
     return alert(err.body + " (" + a.headers["Error-Code"] + ")");
   };
   return bt.send();
